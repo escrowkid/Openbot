@@ -4,6 +4,8 @@
    - chat history (localStorage)
    - streaming via fetch+SSE
    - file attachments (text inlined, images as vision parts)
+   - works against either the Node server (/api/*) or the PHP
+     proxy (api.php?action=*) — chosen at boot
    ============================================================ */
 
 (() => {
@@ -21,6 +23,35 @@ const LS = {
   model: (p) => `openbot:model:${p}`,
   key: (p) => `openbot:key:${p}`,
 };
+
+/* ---------- backend URL resolution ----------
+ * Two deployment shapes are supported:
+ *   1. Node / Apache-with-rewrites:  POST /api/<action>
+ *   2. cPanel without rewrites:      POST api.php?action=<action>
+ * On boot we probe both and pick the first that answers JSON; everything
+ * after that goes through `apiUrl(action)`.
+ */
+let API_MODE = null;   // 'pretty' | 'php' | null (unknown)
+function apiUrl(action) {
+  if (API_MODE === 'php') return `api.php?action=${encodeURIComponent(action)}`;
+  return `api/${encodeURIComponent(action)}`;
+}
+async function probeApi() {
+  // try the pretty path first (Node + Apache with mod_rewrite + .htaccess)
+  for (const [mode, url] of [['pretty', 'api/ping'], ['php', 'api.php?action=ping']]) {
+    try {
+      const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (!r.ok) continue;
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('json')) continue;
+      const j = await r.json();
+      if (j && j.ok) { API_MODE = mode; return mode; }
+    } catch (_) { /* try next */ }
+  }
+  // nothing answered — fall back to the pretty path; errors will be visible.
+  API_MODE = 'pretty';
+  return API_MODE;
+}
 
 const DEFAULT_MODELS = {
   openai:     ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4-turbo'],
@@ -140,10 +171,17 @@ async function validateKey() {
   setStatus('checking', 'checking…');
   elBalance.textContent = '';
   try {
-    const r = await fetch('/api/validate', {
+    const r = await fetch(apiUrl('validate'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, apiKey }),
     });
+    // surface the real failure mode if the backend isn't reachable / not JSON
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('json')) {
+      const sample = (await r.text()).slice(0, 80).replace(/\s+/g, ' ');
+      setStatus('dead', `HTTP ${r.status} (no JSON) — backend not reachable. ${sample}`);
+      return;
+    }
     const j = await r.json();
     if (j.live) {
       setStatus('live', 'live');
@@ -155,7 +193,7 @@ async function validateKey() {
       elBalance.textContent = '';
     }
   } catch (e) {
-    setStatus('dead', 'network error');
+    setStatus('dead', `network: ${e.message || 'fetch failed'}`);
   }
 }
 
@@ -166,12 +204,15 @@ async function loadModelsForProvider() {
   let models = DEFAULT_MODELS[provider] || [];
   if (apiKey) {
     try {
-      const r = await fetch('/api/models', {
+      const r = await fetch(apiUrl('models'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, apiKey }),
       });
-      const j = await r.json();
-      if (Array.isArray(j.models) && j.models.length) models = j.models;
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('json')) {
+        const j = await r.json();
+        if (Array.isArray(j.models) && j.models.length) models = j.models;
+      }
     } catch (_) {}
   }
   // dedupe + preserve order
@@ -551,7 +592,7 @@ async function send() {
 
   let accumulated = '';
   try {
-    const r = await fetch('/api/chat', {
+    const r = await fetch(apiUrl('chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -623,12 +664,22 @@ function setSending(on) {
 }
 
 /* --------------------------- bootstrap --------------------------- */
-function bootstrap() {
+async function bootstrap() {
   loadChats();
 
   const lastProvider = localStorage.getItem(LS.provider) || 'openai';
   if ([...elProvider.options].some(o => o.value === lastProvider)) {
     elProvider.value = lastProvider;
+  }
+
+  // probe before any other API call so validate/models use the right path
+  await probeApi();
+
+  // expose runtime in the footer so cPanel users can see PHP vs Node at a glance
+  const footer = document.querySelector('.footer');
+  if (footer) {
+    footer.insertAdjacentHTML('beforeend',
+      `<br/><span style="opacity:.7">Backend: <code>${API_MODE === 'php' ? 'PHP' : 'Node/rewrites'}</code></span>`);
   }
 
   elApiKey.value = getKey(elProvider.value);

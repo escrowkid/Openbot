@@ -13,7 +13,26 @@ const path = require('path');
 
 const app = express();
 app.use(express.json({ limit: '25mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// 1. Translate `api.php?action=X` URLs into the internal `/api/X` path,
+//    so the cPanel-shaped frontend works against the Node server too.
+app.use((req, res, next) => {
+  if (req.path === '/api.php') {
+    const action = (req.query.action || '').toString().replace(/[^a-zA-Z0-9_-]/g, '');
+    if (action) { req.url = '/api/' + action; }
+  }
+  next();
+});
+
+// 2. Hide server-only files from static serve.
+const HIDDEN = new Set(['/server.js', '/package.json', '/package-lock.json', '/api.php', '/.htaccess', '/.env', '/.gitignore']);
+app.use((req, res, next) => {
+  if (HIDDEN.has(req.path)) return res.status(404).end();
+  next();
+});
+
+// 3. Static files (index.html, app.js, styles.css, stars.js).
+app.use(express.static(__dirname, { index: 'index.html', dotfiles: 'ignore' }));
 
 const PORT = process.env.PORT || 3000;
 
@@ -410,6 +429,9 @@ const PROVIDERS = {
 };
 
 /* --------------------------------- routes --------------------------------- */
+app.get('/api/ping', (_req, res) => res.json({ ok: true, runtime: 'node' }));
+app.post('/api/ping', (_req, res) => res.json({ ok: true, runtime: 'node' }));
+
 app.get('/api/providers', (_req, res) => {
   res.json({
     providers: Object.entries(PROVIDERS).map(([id, p]) => ({
