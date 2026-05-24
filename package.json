@@ -1,0 +1,17 @@
+{
+  "name": "openbot",
+  "version": "1.0.0",
+  "description": "Multi-provider AI chat UI – bring your own API key (OpenAI, Anthropic, Gemini, Groq, DeepSeek, OpenRouter). Dark glass theme, file uploads, streaming, key health & balance check.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}

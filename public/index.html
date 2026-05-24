@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Openbot — bring-your-own-key AI chat</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js" defer></script>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🌸</text></svg>" />
+</head>
+<body>
+
+  <canvas id="star-canvas" aria-hidden="true"></canvas>
+
+  <div class="app">
+
+    <!-- ╭───────────── SIDEBAR ─────────────╮ -->
+    <aside class="sidebar glass">
+      <div class="brand">
+        <span class="brand-mark">✦</span>
+        <h1>OPEN<span class="hi">BOT</span></h1>
+      </div>
+
+      <button id="new-chat" class="btn primary block">+ New chat</button>
+
+      <div class="field">
+        <label>Provider</label>
+        <select id="provider">
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="groq">Groq</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>
+          API key
+          <span id="key-status" class="status status-unknown">● not set</span>
+        </label>
+        <div class="key-row">
+          <input id="api-key" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off" />
+          <button id="toggle-key" class="icon-btn" title="show/hide" type="button">👁</button>
+        </div>
+        <div class="balance" id="balance"></div>
+        <button id="check-key" class="btn ghost block small">Check key</button>
+      </div>
+
+      <div class="field">
+        <label>Model</label>
+        <select id="model"></select>
+      </div>
+
+      <div class="divider">Chats</div>
+      <div id="chats" class="chats"></div>
+
+      <div class="footer">
+        <small>Keys stay in your browser.<br/>Local proxy: <code>localhost</code></small>
+      </div>
+    </aside>
+
+    <!-- ╭───────────── MAIN ─────────────╮ -->
+    <main class="main">
+      <header class="topbar glass">
+        <div class="title">
+          <span id="chat-title" contenteditable="true" spellcheck="false">New chat</span>
+        </div>
+        <div class="topbar-meta">
+          <span id="meta-provider"></span>
+          <span class="dot">•</span>
+          <span id="meta-model"></span>
+        </div>
+      </header>
+
+      <section id="messages" class="messages">
+        <div class="welcome">
+          <h2>Hello, traveller. <span class="hi">✦</span></h2>
+          <p>Paste an API key in the sidebar, pick a model, drop a file in if you want, and send. Streamed responses, vision support where the model allows.</p>
+          <div class="chips">
+            <button class="chip" data-prompt="Explain quantum entanglement like I'm 12.">Explain quantum entanglement</button>
+            <button class="chip" data-prompt="Write a haiku about a CRT monitor at 3am.">Haiku · CRT @ 3am</button>
+            <button class="chip" data-prompt="Refactor this Python snippet for readability:">Refactor Python</button>
+            <button class="chip" data-prompt="Summarise the attached file in 5 bullets.">Summarise file</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="attachments" class="attachments"></div>
+
+      <form id="composer" class="composer glass">
+        <button id="attach-btn" class="icon-btn lg" type="button" title="Attach file">📎</button>
+        <input id="file-input" type="file" multiple hidden
+               accept=".txt,.md,.json,.csv,.py,.js,.ts,.jsx,.tsx,.html,.css,.yaml,.yml,.xml,.log,.rs,.go,.java,.c,.cpp,.h,.sh,image/*" />
+        <textarea id="prompt" rows="1" placeholder="Message Openbot..."></textarea>
+        <button id="send" class="btn primary send" type="submit">
+          <span class="send-label">Send</span>
+          <span class="send-arrow">▸</span>
+        </button>
+        <button id="stop" class="btn ghost stop" type="button" hidden>Stop</button>
+      </form>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="stars.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
